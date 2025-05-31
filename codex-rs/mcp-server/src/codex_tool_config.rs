@@ -1,15 +1,16 @@
 //! Configuration object accepted by the `codex` MCP tool-call.
 
-use std::path::PathBuf;
-
+use codex_core::protocol::AskForApproval;
+use codex_core::protocol::SandboxPolicy;
 use mcp_types::Tool;
 use mcp_types::ToolInputSchema;
 use schemars::JsonSchema;
 use schemars::r#gen::SchemaSettings;
 use serde::Deserialize;
+use std::collections::HashMap;
+use std::path::PathBuf;
 
-use codex_core::protocol::AskForApproval;
-use codex_core::protocol::SandboxPolicy;
+use crate::json_to_toml::json_to_toml;
 
 /// Client-supplied configuration for a `codex` tool-call.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
@@ -21,6 +22,10 @@ pub(crate) struct CodexToolCallParam {
     /// Optional override for the model name (e.g. "o3", "o4-mini")
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
+
+    /// Configuration profile from config.toml to specify default options.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub profile: Option<String>,
 
     /// Working directory for the session. If relative, it is resolved against
     /// the server process's current working directory.
@@ -37,12 +42,10 @@ pub(crate) struct CodexToolCallParam {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sandbox_permissions: Option<Vec<CodexToolCallSandboxPermission>>,
 
-    /// Disable server-side response storage.
+    /// Individual config settings that will override what is in
+    /// CODEX_HOME/config.toml.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub disable_response_storage: Option<bool>,
-    // Custom system instructions.
-    // #[serde(default, skip_serializing_if = "Option::is_none")]
-    // pub instructions: Option<String>,
+    pub config: Option<HashMap<String, serde_json::Value>>,
 }
 
 // Create custom enums for use with `CodexToolCallApprovalPolicy` where we
@@ -117,6 +120,8 @@ pub(crate) fn create_tool_for_codex_tool_call_param() -> Tool {
         })
         .into_generator()
         .into_root_schema_for::<CodexToolCallParam>();
+
+    #[expect(clippy::expect_used)]
     let schema_value =
         serde_json::to_value(&schema).expect("Codex tool schema should serialise to JSON");
 
@@ -138,14 +143,18 @@ pub(crate) fn create_tool_for_codex_tool_call_param() -> Tool {
 impl CodexToolCallParam {
     /// Returns the initial user prompt to start the Codex conversation and the
     /// Config.
-    pub fn into_config(self) -> std::io::Result<(String, codex_core::config::Config)> {
+    pub fn into_config(
+        self,
+        codex_linux_sandbox_exe: Option<PathBuf>,
+    ) -> std::io::Result<(String, codex_core::config::Config)> {
         let Self {
             prompt,
             model,
+            profile,
             cwd,
             approval_policy,
             sandbox_permissions,
-            disable_response_storage,
+            config: cli_overrides,
         } = self;
         let sandbox_policy = sandbox_permissions.map(|perms| {
             SandboxPolicy::from(perms.into_iter().map(Into::into).collect::<Vec<_>>())
@@ -154,13 +163,21 @@ impl CodexToolCallParam {
         // Build ConfigOverrides recognised by codex-core.
         let overrides = codex_core::config::ConfigOverrides {
             model,
+            config_profile: profile,
             cwd: cwd.map(PathBuf::from),
             approval_policy: approval_policy.map(Into::into),
             sandbox_policy,
-            disable_response_storage,
+            model_provider: None,
+            codex_linux_sandbox_exe,
         };
 
-        let cfg = codex_core::config::Config::load_with_overrides(overrides)?;
+        let cli_overrides = cli_overrides
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(k, v)| (k, json_to_toml(v)))
+            .collect();
+
+        let cfg = codex_core::config::Config::load_with_cli_overrides(cli_overrides, overrides)?;
 
         Ok((prompt, cfg))
     }
@@ -185,6 +202,7 @@ mod tests {
     #[test]
     fn verify_codex_tool_json_schema() {
         let tool = create_tool_for_codex_tool_call_param();
+        #[expect(clippy::expect_used)]
         let tool_json = serde_json::to_value(&tool).expect("tool serializes");
         let expected_tool_json = serde_json::json!({
           "name": "codex",
@@ -202,16 +220,21 @@ mod tests {
                 ],
                 "type": "string"
               },
+              "config": {
+                "description": "Individual config settings that will override what is in CODEX_HOME/config.toml.",
+                "additionalProperties": true,
+                "type": "object"
+              },
               "cwd": {
                 "description": "Working directory for the session. If relative, it is resolved against the server process's current working directory.",
                 "type": "string"
               },
-              "disable-response-storage": {
-                "description": "Disable server-side response storage.",
-                "type": "boolean"
-              },
               "model": {
                 "description": "Optional override for the model name (e.g. \"o3\", \"o4-mini\")",
+                "type": "string"
+              },
+              "profile": {
+                "description": "Configuration profile from config.toml to specify default options.",
                 "type": "string"
               },
               "prompt": {
