@@ -1,5 +1,6 @@
 use clap::Parser;
 use codex_common::ApprovalModeCliArg;
+use codex_common::CliConfigOverrides;
 use codex_common::SandboxPermissionOption;
 use std::path::PathBuf;
 
@@ -16,6 +17,10 @@ pub struct Cli {
     /// Model the agent should use.
     #[arg(long, short = 'm')]
     pub model: Option<String>,
+
+    /// Configuration profile from config.toml to specify default options.
+    #[arg(long = "profile", short = 'p')]
+    pub config_profile: Option<String>,
 
     /// Configure when the model requires human approval before executing a command.
     #[arg(long = "ask-for-approval", short = 'a')]
@@ -36,7 +41,6 @@ pub struct Cli {
     #[arg(long = "skip-git-repo-check", default_value_t = false)]
     pub skip_git_repo_check: bool,
 
-    /// Disable server‑side response storage (sends the full conversation context with every request)
-    #[arg(long = "disable-response-storage", default_value_t = false)]
-    pub disable_response_storage: bool,
+    #[clap(skip)]
+    pub config_overrides: CliConfigOverrides,
 }

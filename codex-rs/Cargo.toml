@@ -8,6 +8,8 @@ members = [
     "core",
     "exec",
     "execpolicy",
+    "linux-sandbox",
+    "login",
     "mcp-client",
     "mcp-server",
     "mcp-types",
@@ -21,6 +23,13 @@ version = "0.0.0"
 # crates created with `cargo new -w ...` automatically inherit the 2024
 # edition.
 edition = "2024"
+
+[workspace.lints]
+rust = {}
+
+[workspace.lints.clippy]
+expect_used = "deny"
+unwrap_used = "deny"
 
 [profile.release]
 lto = "fat"
