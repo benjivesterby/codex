@@ -11,12 +11,20 @@ path = "src/main.rs"
 name = "codex_exec"
 path = "src/lib.rs"
 
+[lints]
+workspace = true
+
 [dependencies]
 anyhow = "1"
 chrono = "0.4.40"
 clap = { version = "4", features = ["derive"] }
 codex-core = { path = "../core" }
-codex-common = { path = "../common", features = ["cli", "elapsed"] }
+codex-common = { path = "../common", features = [
+    "cli",
+    "elapsed",
+    "sandbox_summary",
+] }
+codex-linux-sandbox = { path = "../linux-sandbox" }
 mcp-types = { path = "../mcp-types" }
 owo-colors = "4.2.0"
 serde_json = "1"
