@@ -1,6 +1,6 @@
 use multimap::MultiMap;
-use regex::Error as RegexError;
-use regex::Regex;
+use regex_lite::Error as RegexError;
+use regex_lite::Regex;
 
 use crate::ExecCall;
 use crate::Forbidden;
@@ -29,7 +29,7 @@ impl Policy {
         } else {
             let escaped_substrings = forbidden_substrings
                 .iter()
-                .map(|s| regex::escape(s))
+                .map(|s| regex_lite::escape(s))
                 .collect::<Vec<_>>()
                 .join("|");
             Some(Regex::new(&format!("({escaped_substrings})"))?)
@@ -63,7 +63,7 @@ impl Policy {
                             arg: arg.clone(),
                             exec_call: exec_call.clone(),
                         },
-                        reason: format!("arg `{}` contains forbidden substring", arg),
+                        reason: format!("arg `{arg}` contains forbidden substring"),
                     });
                 }
             }
